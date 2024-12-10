@@ -1,101 +1,286 @@
-import Image from "next/image";
+"use client"
 
+import { useState } from 'react'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import ticketContract from '../TicketSale'
+import web3 from '../web3'
+
+// Message Component
+interface MessageProps {
+  message: string
+  type: 'success' | 'error'
+}
+
+function Message({ message, type }: MessageProps) {
+  const bgColor = type === 'success' ? 'bg-green-100' : 'bg-red-100'
+  const textColor = type === 'success' ? 'text-green-800' : 'text-red-800'
+
+  return (
+    <div className={`${bgColor} ${textColor} px-4 py-2 rounded-md mt-4`}>
+      {message}
+    </div>
+  )
+}
+
+// Header Component
+function Header() {
+  return (
+    <header className="bg-gradient-to-r from-blue-500 to-purple-600 shadow-lg">
+      <div className="container mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <h1 className="text-3xl font-bold text-white">Blockchain Ticket App</h1>
+      </div>
+    </header>
+  )
+}
+
+// PurchaseTicket Component
+function PurchaseTicket() {
+  const [ticketNumber, setTicketNumber] = useState('')
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+
+  const handlePurchase = async () => {
+    console.log("Ticket number is " + ticketNumber);
+    if(!ticketNumber || isNaN(Number(ticketNumber))){
+      setMessage({ text: "Please enter a valid ticket number", type: 'error' })
+      return
+    }
+    try {
+      const accounts = await web3.eth.getAccounts();
+      await ticketContract.methods.buyTicket(ticketNumber).send({
+        from: accounts[0],
+        value: web3.utils.toWei('1', 'ether')
+      })
+      .then(() => {
+        console.log("Inside purchase ticket")
+        setMessage({ text: `You have successfully purchased ticket ${ticketNumber}`, type: 'success' })
+      })
+    }
+    catch(error){
+      console.error(error)
+      setMessage({ text: "An error occurred", type: 'error' })
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Purchase Ticket</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Input
+          type="text"
+          placeholder="Enter ticket number"
+          value={ticketNumber}
+          onChange={(e) => setTicketNumber(e.target.value)}
+        />
+        {message && <Message message={message.text} type={message.type} />}
+      </CardContent>
+      <CardFooter>
+        <Button variant="default" onClick={handlePurchase}>Purchase</Button>
+      </CardFooter>
+    </Card>
+  )
+}
+
+// OfferSwap Component
+function OfferSwap() {
+  const [swapTicket, setSwapTicket] = useState('')
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+
+  const handleOfferSwap = async () => {
+    if(!swapTicket || isNaN(Number(swapTicket))){ 
+      setMessage({ text: "Please enter a valid ticket number", type: 'error' });
+      return;
+    }
+
+    try {
+        const accounts = await web3.eth.getAccounts();
+        await ticketContract.methods.offerSwap(swapTicket).send({ 
+          from: accounts[0] 
+        });
+        setMessage({ text: `Your offer to swap for ticket ${swapTicket} is pending`, type: 'success' })
+    }
+    catch(error){
+      console.error(error)
+      setMessage({ text: "An error occurred when swapping. Please try again", type: 'error' })
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Offer Swap</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Input
+          type="text"
+          placeholder="Enter ticket number or address"
+          value={swapTicket}
+          onChange={(e) => setSwapTicket(e.target.value)}
+        />
+        {message && <Message message={message.text} type={message.type} />}
+      </CardContent>
+      <CardFooter>
+        <Button variant="default" onClick={handleOfferSwap}>Offer Swap</Button>
+      </CardFooter>
+    </Card>
+  )
+}
+
+// AcceptOffer Component
+function AcceptOffer() {
+  console.log("The ticket sale methods are " + JSON.stringify(ticketContract.methods))
+  console.log("The deployed address is " +   ticketContract.options.address)
+  const [acceptTicket, setAcceptTicket] = useState('')
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+
+  const handleAcceptOffer = async () => {
+    if (!acceptTicket) {
+      setMessage({ text: "Please enter a valid ticket number or address", type: 'error' })
+      return
+    }
+
+    try {
+      const accounts = await web3.eth.getAccounts()
+      await ticketContract.methods.acceptSwapOffer(acceptTicket).send({
+        from: accounts[0],
+      })
+
+      setMessage({
+        text: `You have successfully accepted the swap offer with ticket/address: ${acceptTicket}`,
+        type: 'success',
+      })
+    } catch (error) {
+      console.error(error)
+      setMessage({
+        text: "Failed to accept the offer. Please try again.",
+        type: 'error',
+      })
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Accept Offer</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Input
+          type="text"
+          placeholder="Enter ticket number or address"
+          value={acceptTicket}
+          onChange={(e) => setAcceptTicket(e.target.value)}
+        />
+        {message && <Message message={message.text} type={message.type} />}
+      </CardContent>
+      <CardFooter>
+        <Button variant="default" onClick={handleAcceptOffer}>Accept Offer</Button>
+      </CardFooter>
+    </Card>
+  )
+}
+
+// GetTicketNumber Component
+function GetTicketNumber() {
+  const [walletAddress, setWalletAddress] = useState('')
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+
+  const handleGetTicketNumber = async () => {
+    if (!web3.utils.isAddress(walletAddress)) {
+      setMessage({ text: "Please enter a valid wallet address", type: 'error' })
+      return
+    }
+
+    try {
+      const ticketNumber = await ticketContract.methods.getTicketNumber(walletAddress).call()
+
+      setMessage({
+        text: `The ticket number for wallet ${walletAddress} is ${ticketNumber}`,
+        type: 'success',
+      })
+    } catch (error) {
+      console.error(error)
+      setMessage({
+        text: "Failed to retrieve the ticket number. Please try again.",
+        type: 'error',
+      })
+    }
+  }
+
+  return (
+    <Card className="w-full md:w-auto">
+      <CardHeader>
+        <CardTitle>Get Ticket Number</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Input
+          type="text"
+          placeholder="Enter wallet address"
+          value={walletAddress}
+          onChange={(e) => setWalletAddress(e.target.value)}
+        />
+        {message && <Message message={message.text} type={message.type} />}
+      </CardContent>
+      <CardFooter>
+        <Button variant="default" onClick={handleGetTicketNumber}>Get Ticket</Button>
+      </CardFooter>
+    </Card>
+  )
+}
+
+// ReturnTicket Component
+function ReturnTicket() {
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+
+  const handleReturnTicket = async () => {
+      try {
+        const accounts = await web3.eth.getAccounts();
+        await ticketContract.methods.resaleTicket().send({ 
+          from: accounts[0]
+        });
+        setMessage({ text: "Your ticket has been returned and a refund (minus service fee) has been processed", type: 'success' })
+      }
+      catch(error){ 
+        console.error(error)
+        setMessage({ text: "An error occurred on returning ticket", type: 'error' })
+      }
+  }
+
+  return (
+    <Card className="w-full md:w-auto">
+      <CardHeader>
+        <CardTitle>Return Ticket</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-gray-500">Click to return your ticket and receive a refund (service fee will be deducted).</p>
+        {message && <Message message={message.text} type={message.type} />}
+      </CardContent>
+      <CardFooter>
+        <Button variant="default" onClick={handleReturnTicket}>Return Ticket</Button>
+      </CardFooter>
+    </Card>
+  )
+}
+
+// Main Page Component
 export default function Home() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="min-h-screen bg-gradient-to-b from-gray-100 to-gray-200">
+      <Header />
+      <main className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <PurchaseTicket />
+          <OfferSwap />
+          <AcceptOffer />
+          <div className="md:col-span-2 flex flex-col sm:flex-row justify-center gap-8">
+            <GetTicketNumber />
+            <ReturnTicket />
+          </div>
         </div>
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
-  );
+  )
 }
+
